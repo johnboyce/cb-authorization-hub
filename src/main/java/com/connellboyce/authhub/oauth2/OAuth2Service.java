@@ -15,7 +15,6 @@ import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.RSASSASigner;
-import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
@@ -31,7 +30,6 @@ import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
-import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -43,6 +41,17 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * OAuth 2.0 Authorization Server Service.
  * Implements OAuth 2.1 and OpenID Connect 1.0 specifications.
+ * 
+ * <p><strong>Production Notes:</strong></p>
+ * <ul>
+ *   <li>Authorization codes and refresh tokens are stored in-memory. For production,
+ *       implement persistent storage (e.g., Redis, MongoDB) to support horizontal scaling
+ *       and persistence across restarts.</li>
+ *   <li>The signing key pair is loaded from files or generated at startup. In production,
+ *       use a stable key with proper key rotation strategy.</li>
+ *   <li>The key ID is generated randomly at startup. For production with multiple instances,
+ *       use a stable key ID or implement proper JWKS management.</li>
+ * </ul>
  */
 @ApplicationScoped
 public class OAuth2Service {
@@ -350,7 +359,7 @@ public class OAuth2Service {
 		String accessToken = generateExchangedToken(client, subjectClaims, scopes);
 		
 		return new TokenResponse(accessToken, "Bearer", accessTokenLifespan, null, 
-				String.join(" ", scopes), "urn:ietf:params:oauth:token-type:access_token");
+				String.join(" ", scopes), null, "urn:ietf:params:oauth:token-type:access_token");
 	}
 	
 	/**
@@ -660,8 +669,14 @@ public class OAuth2Service {
 			long expiresIn,
 			String refreshToken,
 			String scope,
-			String idToken
-	) {}
+			String idToken,
+			String issuedTokenType
+	) {
+		public TokenResponse(String accessToken, String tokenType, long expiresIn, 
+				String refreshToken, String scope, String idToken) {
+			this(accessToken, tokenType, expiresIn, refreshToken, scope, idToken, null);
+		}
+	}
 	
 	public static class OAuth2Exception extends Exception {
 		private final String error;

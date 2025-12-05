@@ -8,7 +8,6 @@ import com.connellboyce.authhub.service.UserService;
 import io.quarkus.qute.Template;
 import io.quarkus.qute.TemplateInstance;
 import io.quarkus.security.identity.SecurityIdentity;
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -21,6 +20,9 @@ import java.util.*;
 /**
  * OAuth 2.0 Authorization Endpoint Controller.
  * Handles the authorization code flow including consent.
+ * 
+ * <p><strong>Production Note:</strong> Pending authorizations are stored in-memory.
+ * For production use with multiple instances, implement session-based or distributed storage.</p>
  */
 @Path("/oauth2")
 public class OAuth2AuthorizationController {

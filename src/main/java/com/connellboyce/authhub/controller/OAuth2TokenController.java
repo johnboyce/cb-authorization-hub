@@ -150,6 +150,9 @@ public class OAuth2TokenController {
 		if (result.idToken() != null) {
 			response.put("id_token", result.idToken());
 		}
+		if (result.issuedTokenType() != null) {
+			response.put("issued_token_type", result.issuedTokenType());
+		}
 		
 		return Response.ok(response).build();
 	}
