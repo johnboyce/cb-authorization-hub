@@ -1,12 +1,21 @@
 package com.connellboyce.authhub.repository;
 
 import com.connellboyce.authhub.model.dao.Scope;
-import org.springframework.data.mongodb.repository.MongoRepository;
+import io.quarkus.mongodb.panache.PanacheMongoRepository;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface ScopeRepository extends MongoRepository<Scope, String> {
-	Optional<Scope> findByName(String name);
-	Optional<List<Scope>> findByApplicationId(String applicationId);
+@ApplicationScoped
+public class ScopeRepository implements PanacheMongoRepository<Scope> {
+	
+	public Optional<Scope> findByName(String name) {
+		return find("name", name).firstResultOptional();
+	}
+	
+	public Optional<List<Scope>> findByApplicationId(String applicationId) {
+		List<Scope> scopes = find("applicationId", applicationId).list();
+		return scopes.isEmpty() ? Optional.empty() : Optional.of(scopes);
+	}
 }

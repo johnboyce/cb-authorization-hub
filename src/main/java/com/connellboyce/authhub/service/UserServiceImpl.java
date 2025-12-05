@@ -3,37 +3,35 @@ package com.connellboyce.authhub.service;
 import com.connellboyce.authhub.model.dao.CBUser;
 import com.connellboyce.authhub.repository.UserRepository;
 import com.connellboyce.authhub.util.CBRole;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import org.mindrot.jbcrypt.BCrypt;
 
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
-@Service
+@ApplicationScoped
 public class UserServiceImpl implements UserService {
-	@Autowired
-	private UserRepository userRepository;
+	
+	@Inject
+	UserRepository userRepository;
 
-	@Autowired
-	private PasswordEncoder passwordEncoder;
-
-	public UserDetails createUser(String username, String password, String email, String firstName, String lastName) throws IllegalArgumentException {
+	@Override
+	@Transactional
+	public CBUser createUser(String username, String password, String email, String firstName, String lastName) throws IllegalArgumentException {
 		String id = String.valueOf(UUID.randomUUID());
 		CBUser newUser = new CBUser(
 				id,
 				username,
-				passwordEncoder.encode(password),
+				BCrypt.hashpw(password, BCrypt.gensalt()),
 				Set.of(CBRole.ROLE_USER.withoutPrefix()),
 				email,
 				firstName,
 				lastName
 		);
-		userRepository.findById(id).ifPresent(existingUser -> {
+		
+		userRepository.findByIdString(id).ifPresent(existingUser -> {
 			throw new IllegalArgumentException("User ID already exists");
 		});
 		userRepository.findByUsername(username).ifPresent(existingUser -> {
@@ -43,12 +41,12 @@ public class UserServiceImpl implements UserService {
 			throw new IllegalArgumentException("Email already exists");
 		});
 
-		userRepository.save(newUser);
+		userRepository.persist(newUser);
 
-		return new User(newUser.getUsername(), newUser.getPassword(), newUser.getRoles().stream().map(SimpleGrantedAuthority::new).collect(Collectors.toList()));
-
+		return newUser;
 	}
 
+	@Override
 	public CBUser getCBUserByUsername(String username) {
 		return userRepository.findByUsername(username).orElse(null);
 	}

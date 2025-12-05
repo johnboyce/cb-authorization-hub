@@ -1,11 +1,7 @@
 package com.connellboyce.authhub.model.payload.request;
 
 import lombok.Data;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,24 +13,30 @@ public class CreateClientRequest {
 	private List<String> scopes;
 	private List<String> grantTypes;
 
-	public static RegisteredClient toRegisteredClient(String clientId, String clientSecret, List<String> redirectUris, List<String> scopes, List<String> grantTypes) {
-		RegisteredClient.Builder clientBuilder = RegisteredClient.withId(String.valueOf(UUID.randomUUID()))
-				.clientId(clientId)
-				.clientIdIssuedAt(Instant.now())
-				.clientSecret(clientSecret)
-				.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-				.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST);
-		for (String scope : scopes) {
-			clientBuilder.scope(scope);
-		}
-		for (String redirectUri : redirectUris) {
-			clientBuilder.redirectUri(redirectUri);
-		}
-		for (String grantType : grantTypes) {
-			clientBuilder.authorizationGrantType(new AuthorizationGrantType(grantType));
-		}
-
-		return clientBuilder.build();
+	/**
+	 * Creates a RegisteredClient representation for use in OAuth operations.
+	 * Note: In Quarkus, we handle this differently than Spring Authorization Server.
+	 */
+	public static ClientRegistration toClientRegistration(String clientId, String clientSecret, List<String> redirectUris, List<String> scopes, List<String> grantTypes) {
+		return new ClientRegistration(
+				String.valueOf(UUID.randomUUID()),
+				clientId,
+				clientSecret,
+				redirectUris,
+				scopes,
+				grantTypes
+		);
 	}
 
+	/**
+	 * Simple POJO to represent a client registration.
+	 */
+	public record ClientRegistration(
+			String id,
+			String clientId,
+			String clientSecret,
+			List<String> redirectUris,
+			List<String> scopes,
+			List<String> grantTypes
+	) {}
 }

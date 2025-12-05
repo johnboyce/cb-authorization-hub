@@ -3,41 +3,48 @@ package com.connellboyce.authhub.controller;
 import com.connellboyce.authhub.model.dao.Scope;
 import com.connellboyce.authhub.service.ApplicationService;
 import com.connellboyce.authhub.service.ScopeService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
-@Controller
-@RequestMapping("/portal/operation/scope")
+import java.net.URI;
+
+@Path("/portal/operation/scope")
+@RolesAllowed("DEVELOPER")
 public class ScopesController {
-	@Autowired
-	private ScopeService scopeService;
+	
+	@Inject
+	ScopeService scopeService;
 
-	@Autowired
+	@Inject
 	ApplicationService applicationService;
 
-	@PostMapping
-	@PreAuthorize("@applicationService.validateApplicationOwnership(authentication, #applicationId)")
-	public String createScope(@RequestParam("name") String name, @RequestParam("applicationId") String applicationId, Authentication authentication, RedirectAttributes redirectAttributes) {
-		Scope result = scopeService.createScope(
-				name,
-				applicationId
-		);
+	@Inject
+	SecurityIdentity identity;
+
+	@POST
+	@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+	public Response createScope(
+			@FormParam("name") String name,
+			@FormParam("applicationId") String applicationId) {
+		
+		// Validate ownership
+		if (!applicationService.validateApplicationOwnership(identity, applicationId)) {
+			return Response.status(Response.Status.FORBIDDEN).build();
+		}
+		
 		try {
+			Scope result = scopeService.createScope(name, applicationId);
 			if (result != null) {
-				redirectAttributes.addFlashAttribute("success", "Scope created successfully!");
+				return Response.seeOther(URI.create("/portal/applications/" + applicationId + "?success=Scope+created+successfully")).build();
 			} else {
-				redirectAttributes.addFlashAttribute("error", "Scope creation failed");
+				return Response.seeOther(URI.create("/portal/applications/" + applicationId + "?error=Scope+creation+failed")).build();
 			}
-			return "redirect:/portal/applications/" + applicationId;
 		} catch (Exception e) {
-			redirectAttributes.addFlashAttribute("error", "Scope creation failed");
-			return "redirect:/portal/applications/" + applicationId;
+			return Response.seeOther(URI.create("/portal/applications/" + applicationId + "?error=Scope+creation+failed")).build();
 		}
 	}
 }

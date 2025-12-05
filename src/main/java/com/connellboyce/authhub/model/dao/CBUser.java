@@ -1,17 +1,19 @@
 package com.connellboyce.authhub.model.dao;
 
+import io.quarkus.mongodb.panache.common.MongoEntity;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+import lombok.NoArgsConstructor;
+import org.bson.codecs.pojo.annotations.BsonId;
 
 import java.util.Set;
 
 @Data
 @AllArgsConstructor
-@Document(collection = "users")
+@NoArgsConstructor
+@MongoEntity(collection = "users")
 public class CBUser {
-	@Id
+	@BsonId
 	private String id;
 	private String username;
 	private String password;

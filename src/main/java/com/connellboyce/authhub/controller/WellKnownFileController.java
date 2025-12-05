@@ -1,43 +1,61 @@
 package com.connellboyce.authhub.controller;
 
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.util.ResourceUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
-@RestController
-@RequestMapping(value = {"", "/.well-known"})
+@Path("")
 public class WellKnownFileController {
-	@GetMapping("/robots.txt")
-	public ResponseEntity<?> getRobotsDotTxt() {
+	
+	@GET
+	@Path("/robots.txt")
+	@Produces(MediaType.TEXT_PLAIN)
+	public Response getRobotsDotTxt() {
 		try {
 			return getTxtFileContents("robots.txt");
 		} catch (IOException e) {
-			return ResponseEntity.internalServerError().build();
+			return Response.serverError().build();
 		}
 	}
 
-	@GetMapping("/humans.txt")
-	public ResponseEntity<?> getHumansDotTxt() {
+	@GET
+	@Path("/.well-known/robots.txt")
+	@Produces(MediaType.TEXT_PLAIN)
+	public Response getWellKnownRobotsDotTxt() {
+		return getRobotsDotTxt();
+	}
+
+	@GET
+	@Path("/humans.txt")
+	@Produces(MediaType.TEXT_PLAIN)
+	public Response getHumansDotTxt() {
 		try {
 			return getTxtFileContents("humans.txt");
 		} catch (IOException e) {
-			return ResponseEntity.internalServerError().build();
+			return Response.serverError().build();
 		}
 	}
 
-	private ResponseEntity<?> getTxtFileContents(String fileName) throws IOException {
-		String path = "classpath:static/" + fileName;
-		File file = ResourceUtils.getFile(path);
-		String contents = new String(Files.readAllBytes(file.toPath()));
-		return ResponseEntity.ok()
-				.contentType(MediaType.TEXT_PLAIN)
-				.body(contents);
+	@GET
+	@Path("/.well-known/humans.txt")
+	@Produces(MediaType.TEXT_PLAIN)
+	public Response getWellKnownHumansDotTxt() {
+		return getHumansDotTxt();
+	}
+
+	private Response getTxtFileContents(String fileName) throws IOException {
+		try (InputStream is = getClass().getClassLoader().getResourceAsStream("META-INF/resources/static/" + fileName)) {
+			if (is == null) {
+				return Response.status(Response.Status.NOT_FOUND).build();
+			}
+			String contents = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+			return Response.ok(contents).build();
+		}
 	}
 }
