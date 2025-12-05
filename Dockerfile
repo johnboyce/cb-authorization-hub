@@ -1,5 +1,5 @@
 # Stage 1: Build the native executable
-FROM quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-17 AS build
+FROM quay.io/quarkus/ubi-quarkus-mandrel-builder-image:jdk-21 AS build
 
 COPY --chown=quarkus:quarkus mvnw /code/mvnw
 COPY --chown=quarkus:quarkus .mvn /code/.mvn
