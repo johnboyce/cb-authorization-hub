@@ -118,7 +118,8 @@ public class PageController {
 		Map<String, String> grantTypes = Map.of(
 				"authorization_code", "Authorization Code",
 				"client_credentials", "Client Credentials",
-				"refresh_token", "Refresh Token"
+				"refresh_token", "Refresh Token",
+				"urn:ietf:params:oauth:grant-type:token-exchange", "Token Exchange"
 		);
 		
 		Map<String, List<Scope>> scopeMap = new HashMap<>();
@@ -151,7 +152,8 @@ public class PageController {
 		Map<String, String> grantTypes = Map.of(
 				"authorization_code", "Authorization Code",
 				"client_credentials", "Client Credentials",
-				"refresh_token", "Refresh Token"
+				"refresh_token", "Refresh Token",
+				"urn:ietf:params:oauth:grant-type:token-exchange", "Token Exchange"
 		);
 		
 		Map<String, List<Scope>> scopeMap = new HashMap<>();

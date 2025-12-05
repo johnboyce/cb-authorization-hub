@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authorize Application</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+<div class="px-8 pt-16 lg:px-16">
+    <h1 class="text-white font-bold text-5xl lg:text-3xl mb-4">connell<span class="text-[#f9004d]">boyce</span>.com</h1>
+
+    <div class="bg-neutral-900 px-12 py-16 lg:py-8 rounded-lg w-fit max-w-2xl">
+        <h2 class="text-white text-6xl lg:text-4xl font-semibold mb-8 lg:mb-4">authorize application</h2>
+        
+        <div class="text-white text-3xl lg:text-xl mb-8">
+            <p class="mb-4">The application <strong class="text-[#f9004d]">{clientId}</strong> is requesting access to your account.</p>
+            
+            <p class="mb-4">This application would like to:</p>
+            <ul class="list-disc list-inside mb-8">
+                {#for scope in scopes}
+                <li class="my-2">
+                    {#if scope == 'openid'}
+                    Verify your identity
+                    {#else if scope == 'profile'}
+                    Access your profile information
+                    {#else if scope == 'email'}
+                    Access your email address
+                    {#else if scope == 'offline_access'}
+                    Access your data when you're not using the app
+                    {#else}
+                    {scope}
+                    {/if}
+                </li>
+                {/for}
+            </ul>
+        </div>
+        
+        <form action="/oauth2/authorize/consent" method="post">
+            <input type="hidden" name="auth_id" value="{authId}"/>
+            
+            <div class="flex gap-4">
+                <button type="submit" name="action" value="approve"
+                        class="bg-[#f9004d] border-4 font-bold hover:bg-black border-[#f9004d] py-2 px-8 rounded-xl text-white cursor-pointer text-4xl lg:text-2xl">
+                    Authorize
+                </button>
+                <button type="submit" name="action" value="deny"
+                        class="bg-neutral-700 border-4 font-bold hover:bg-black border-neutral-700 py-2 px-8 rounded-xl text-white cursor-pointer text-4xl lg:text-2xl">
+                    Deny
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+</body>
+</html>

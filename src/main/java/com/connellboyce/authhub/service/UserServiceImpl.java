@@ -50,4 +50,9 @@ public class UserServiceImpl implements UserService {
 	public CBUser getCBUserByUsername(String username) {
 		return userRepository.findByUsername(username).orElse(null);
 	}
+
+	@Override
+	public CBUser getCBUserById(String id) {
+		return userRepository.findByIdString(id).orElse(null);
+	}
 }
