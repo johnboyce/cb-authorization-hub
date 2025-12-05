@@ -5,135 +5,165 @@ import com.connellboyce.authhub.service.ApplicationService;
 import com.connellboyce.authhub.service.ClientService;
 import com.connellboyce.authhub.service.ScopeService;
 import com.connellboyce.authhub.service.UserService;
-import jakarta.servlet.http.HttpSession;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
+import io.quarkus.qute.Template;
+import io.quarkus.qute.TemplateInstance;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
 
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.*;
 
-@Controller
+@Path("/")
+@Produces(MediaType.TEXT_HTML)
 public class PageController {
 
-	@Value("#{'${spring.security.login.entry-point.preserved-params}'.split(',')}")
-	private Set<String> preservedParams;
+	@Inject
+	Template login;
 
-	@Autowired
-	private ClientService clientService;
+	@Inject
+	Template register;
 
-	@Autowired
-	private UserService userService;
+	@Inject
+	Template portalIndex;
 
-	@Autowired
-	private ApplicationService applicationService;
+	@Inject
+	Template portalClients;
 
-	@Autowired
-	private ScopeService scopeService;
+	@Inject
+	Template portalApplications;
 
-	@GetMapping("/login")
-	public String login(HttpSession session, Model model) {
-		preservedParams.forEach(param -> {
-			Object value = session.getAttribute("auth_param_" + param);
-			if (value != null) {
-				model.addAttribute(param, value);
-			}
-		});
-		if (model.getAttribute("client_id") != null) {
-			model.addAttribute("client", clientService.getClientByClientId(Objects.requireNonNull(model.getAttribute("client_id")).toString()));
-		}
+	@Inject
+	Template portalCreateApplication;
 
-		return "login";
+	@Inject
+	Template portalCreateClient;
+
+	@Inject
+	Template portalEditApplication;
+
+	@Inject
+	Template portalEditClient;
+
+	@Inject
+	ClientService clientService;
+
+	@Inject
+	UserService userService;
+
+	@Inject
+	ApplicationService applicationService;
+
+	@Inject
+	ScopeService scopeService;
+
+	@Inject
+	SecurityIdentity identity;
+
+	@GET
+	@Path("/login")
+	public TemplateInstance loginPage() {
+		// For now, simplified without session management
+		return login.data("client", null);
 	}
 
-	@GetMapping("/register")
-	public String register() {
-		return "register";
+	@GET
+	@Path("/register")
+	public TemplateInstance registerPage() {
+		return register.instance();
 	}
 
-	@GetMapping("/portal/index")
-	public String portalHomePage(Model model, Authentication authentication) {
-		model.addAttribute("name", authentication.getName());
-		return "portal/index";
+	@GET
+	@Path("/portal/index")
+	@RolesAllowed("DEVELOPER")
+	public TemplateInstance portalHomePage() {
+		return portalIndex.data("name", identity.getPrincipal().getName());
 	}
 
-	@GetMapping("/portal/clients")
-	public String portalClientsPage(Model model, Authentication authentication) {
-		model.addAttribute("clients", clientService.getClientsByOwner(userService.getCBUserByUsername(((UserDetails) authentication.getPrincipal()).getUsername()).getId()));
-
-		return "portal/clients";
+	@GET
+	@Path("/portal/clients")
+	@RolesAllowed("DEVELOPER")
+	public TemplateInstance portalClientsPage() {
+		var user = userService.getCBUserByUsername(identity.getPrincipal().getName());
+		var clients = clientService.getClientsByOwner(user.getId());
+		return portalClients.data("clients", clients);
 	}
 
-	@GetMapping("/portal/applications")
-	public String portalApplicationsPage(Model model, Authentication authentication) {
-		model.addAttribute("applications", applicationService.getApplicationsByOwnerId(userService.getCBUserByUsername(((UserDetails) authentication.getPrincipal()).getUsername()).getId()));
-
-		return "portal/applications";
+	@GET
+	@Path("/portal/applications")
+	@RolesAllowed("DEVELOPER")
+	public TemplateInstance portalApplicationsPage() {
+		var user = userService.getCBUserByUsername(identity.getPrincipal().getName());
+		var applications = applicationService.getApplicationsByOwnerId(user.getId());
+		return portalApplications.data("applications", applications);
 	}
 
-	@GetMapping("/portal/applications/create")
-	public String createApplicationPage() {
-		return "portal/create-application";
+	@GET
+	@Path("/portal/applications/create")
+	@RolesAllowed("DEVELOPER")
+	public TemplateInstance createApplicationPage() {
+		return portalCreateApplication.instance();
 	}
 
-	@GetMapping("/portal/clients/create")
-	public String createClientPage(Model model) {
-		model.addAttribute("generatedSecret", generateSecret());
-		model.addAttribute("grantTypes", Map.ofEntries(
-				Map.entry("authorization_code", "Authorization Code"),
-				Map.entry("client_credentials", "Client Credentials"),
-				Map.entry("refresh_token", "Refresh Token")
-		));
+	@GET
+	@Path("/portal/clients/create")
+	@RolesAllowed("DEVELOPER")
+	public TemplateInstance createClientPage() {
+		Map<String, String> grantTypes = Map.of(
+				"authorization_code", "Authorization Code",
+				"client_credentials", "Client Credentials",
+				"refresh_token", "Refresh Token"
+		);
+		
 		Map<String, List<Scope>> scopeMap = new HashMap<>();
 		scopeService.getAllScopes().forEach(scope -> {
 			String appName = applicationService.getApplicationById(scope.getApplicationId()).getName();
-			if(scopeMap.containsKey(appName)) {
-				List<Scope> scopeList = scopeMap.get(appName);
-				scopeList.add(scope);
-			} else {
-				scopeMap.put(appName, new ArrayList<>(List.of(scope)));
-			}
+			scopeMap.computeIfAbsent(appName, k -> new ArrayList<>()).add(scope);
 		});
-		model.addAttribute("scopesByApplication", scopeMap);
-		return "portal/create-client";
+		
+		return portalCreateClient
+				.data("generatedSecret", generateSecret())
+				.data("grantTypes", grantTypes)
+				.data("scopesByApplication", scopeMap);
 	}
 
-	@GetMapping("/portal/applications/{id}")
-	public String editApplicationPage(@PathVariable("id") String id, Model model, Authentication authentication) {
+	@GET
+	@Path("/portal/applications/{id}")
+	@RolesAllowed("DEVELOPER")
+	public TemplateInstance editApplicationPage(@PathParam("id") String id) {
 		//TODO: Check if the user is the owner of the application
-		model.addAttribute("app", applicationService.getApplicationById(id));
-		model.addAttribute("scopes", scopeService.getScopesByApplicationId(id));
-		return "portal/edit-application";
+		return portalEditApplication
+				.data("app", applicationService.getApplicationById(id))
+				.data("scopes", scopeService.getScopesByApplicationId(id));
 	}
 
-	@GetMapping("/portal/clients/{clientId}")
-	public String editClientPage(@PathVariable("clientId") String clientId, Model model, Authentication authentication) {
+	@GET
+	@Path("/portal/clients/{clientId}")
+	@RolesAllowed("DEVELOPER")
+	public TemplateInstance editClientPage(@PathParam("clientId") String clientId) {
 		//TODO: Check if the user is the owner of the client
-		model.addAttribute("client", clientService.getClientByClientId(clientId));
-		model.addAttribute("grantTypes", Map.ofEntries(
-				Map.entry("authorization_code", "Authorization Code"),
-				Map.entry("client_credentials", "Client Credentials"),
-				Map.entry("refresh_token", "Refresh Token")
-		));
+		Map<String, String> grantTypes = Map.of(
+				"authorization_code", "Authorization Code",
+				"client_credentials", "Client Credentials",
+				"refresh_token", "Refresh Token"
+		);
+		
 		Map<String, List<Scope>> scopeMap = new HashMap<>();
 		scopeService.getAllScopes().forEach(scope -> {
 			String appName = applicationService.getApplicationById(scope.getApplicationId()).getName();
-			if(scopeMap.containsKey(appName)) {
-				List<Scope> scopeList = scopeMap.get(appName);
-				scopeList.add(scope);
-			} else {
-				scopeMap.put(appName, new ArrayList<>(List.of(scope)));
-			}
+			scopeMap.computeIfAbsent(appName, k -> new ArrayList<>()).add(scope);
 		});
-		model.addAttribute("scopesByApplication", scopeMap);
-
-		return "portal/edit-client";
+		
+		return portalEditClient
+				.data("client", clientService.getClientByClientId(clientId))
+				.data("grantTypes", grantTypes)
+				.data("scopesByApplication", scopeMap);
 	}
 
 	private String generateSecret() {

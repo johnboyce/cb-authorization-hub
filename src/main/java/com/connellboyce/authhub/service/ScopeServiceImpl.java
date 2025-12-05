@@ -3,21 +3,24 @@ package com.connellboyce.authhub.service;
 import com.connellboyce.authhub.model.dao.Application;
 import com.connellboyce.authhub.model.dao.Scope;
 import com.connellboyce.authhub.repository.ScopeRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
-@Service
+@ApplicationScoped
 public class ScopeServiceImpl implements ScopeService {
-	@Autowired
-	private ScopeRepository scopeRepository;
+	
+	@Inject
+	ScopeRepository scopeRepository;
 
-	@Autowired
-	private ApplicationService applicationService;
+	@Inject
+	ApplicationService applicationService;
 
 	@Override
+	@Transactional
 	public Scope createScope(String name, String applicationId) {
 		if (name == null || name.isEmpty() || applicationId == null || applicationId.isEmpty()) {
 			throw new IllegalArgumentException("Scope name and application ID must be provided.");
@@ -29,7 +32,9 @@ public class ScopeServiceImpl implements ScopeService {
 		if (parentApplication == null) {
 			throw new IllegalArgumentException("Provided application ID does not exist.");
 		}
-		return scopeRepository.save(new Scope(String.valueOf(UUID.randomUUID()), name, applicationId));
+		Scope scope = new Scope(String.valueOf(UUID.randomUUID()), name, applicationId);
+		scopeRepository.persist(scope);
+		return scope;
 	}
 
 	@Override
@@ -42,6 +47,6 @@ public class ScopeServiceImpl implements ScopeService {
 
 	@Override
 	public List<Scope> getAllScopes() {
-		return scopeRepository.findAll();
+		return scopeRepository.listAll();
 	}
 }

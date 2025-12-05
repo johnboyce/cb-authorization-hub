@@ -1,15 +1,17 @@
 package com.connellboyce.authhub.model.dao;
 
+import io.quarkus.mongodb.panache.common.MongoEntity;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+import lombok.NoArgsConstructor;
+import org.bson.codecs.pojo.annotations.BsonId;
 
 @Data
 @AllArgsConstructor
-@Document(collection = "applications")
+@NoArgsConstructor
+@MongoEntity(collection = "applications")
 public class Application {
-	@Id
+	@BsonId
 	private String id;
 	private String name;
 	private String description;

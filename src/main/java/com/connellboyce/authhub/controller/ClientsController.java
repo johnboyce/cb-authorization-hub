@@ -3,77 +3,94 @@ package com.connellboyce.authhub.controller;
 import com.connellboyce.authhub.model.dao.MongoRegisteredClient;
 import com.connellboyce.authhub.service.AuthUtilService;
 import com.connellboyce.authhub.service.ClientService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import io.quarkus.logging.Log;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 
-import static com.connellboyce.authhub.model.payload.request.CreateClientRequest.toRegisteredClient;
+import static com.connellboyce.authhub.model.payload.request.CreateClientRequest.toClientRegistration;
 
-@Controller
-@RequestMapping("/portal/operation/client")
+@Path("/portal/operation/client")
+@RolesAllowed("DEVELOPER")
 public class ClientsController {
-	private final Logger LOGGER = LoggerFactory.getLogger(ClientsController.class);
 
-	@Autowired
+	@Inject
 	ClientService clientService;
 
-	@Autowired
+	@Inject
 	AuthUtilService authUtilService;
 
-	@PostMapping
-	public String createClient(@RequestParam("clientId") String clientId, @RequestParam("clientSecret") String clientSecret, @RequestParam("grantTypes") List<String> grantTypes, @RequestParam("redirectUrls") List<String> redirectUrls, @RequestParam("scopes") List<String> scopes, Authentication authentication, RedirectAttributes redirectAttributes) {
-		Optional<String> userId = authUtilService.getUserIdFromAuthentication(authentication);
+	@Inject
+	SecurityIdentity identity;
+
+	@POST
+	@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+	public Response createClient(
+			@FormParam("clientId") String clientId,
+			@FormParam("clientSecret") String clientSecret,
+			@FormParam("grantTypes") List<String> grantTypes,
+			@FormParam("redirectUrls") List<String> redirectUrls,
+			@FormParam("scopes") List<String> scopes) {
+		
+		Optional<String> userId = authUtilService.getUserIdFromSecurityIdentity(identity);
 		if (userId.isEmpty()) {
-			redirectAttributes.addFlashAttribute("error", "User not authenticated");
-			return "redirect:/portal/clients";
+			return Response.seeOther(URI.create("/portal/clients?error=User+not+authenticated")).build();
 		}
 
-		RegisteredClient createdClient = toRegisteredClient(clientId, clientSecret, redirectUrls, scopes, grantTypes);
+		var clientRegistration = toClientRegistration(clientId, clientSecret, redirectUrls, scopes, grantTypes);
 
-		LOGGER.debug("Creating client with ID: {}", createdClient.getClientId());
-		MongoRegisteredClient client = clientService.createClient(createdClient, userId.get());
+		Log.debugf("Creating client with ID: %s", clientId);
+		MongoRegisteredClient client = clientService.createClient(clientRegistration, userId.get());
 		if (client != null) {
-			redirectAttributes.addFlashAttribute("success", "Client created successfully!");
+			return Response.seeOther(URI.create("/portal/clients?success=Client+created+successfully")).build();
 		} else {
-			redirectAttributes.addFlashAttribute("error", "Failed to create client");
+			return Response.seeOther(URI.create("/portal/clients?error=Failed+to+create+client")).build();
 		}
-		return "redirect:/portal/clients";
 	}
 
-	@PutMapping
-	@PreAuthorize("@clientService.validateClientOwnership(authentication, #clientId)")
-	public String updateClient(@RequestParam("clientId") String clientId, @RequestParam List<String> grantTypes, @RequestParam List<String> redirectUrls, @RequestParam List<String> scopes, Authentication authentication, RedirectAttributes redirectAttributes) {
-		Optional<String> userId = authUtilService.getUserIdFromAuthentication(authentication);
+	@PUT
+	@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+	public Response updateClient(
+			@FormParam("clientId") String clientId,
+			@FormParam("grantTypes") List<String> grantTypes,
+			@FormParam("redirectUrls") List<String> redirectUrls,
+			@FormParam("scopes") List<String> scopes) {
+		
+		// Validate ownership
+		if (!clientService.validateClientOwnership(identity, clientId)) {
+			return Response.status(Response.Status.FORBIDDEN).build();
+		}
+		
+		Optional<String> userId = authUtilService.getUserIdFromSecurityIdentity(identity);
 		if (userId.isEmpty()) {
-			redirectAttributes.addFlashAttribute("error", "User not authenticated");
-			return "redirect:/portal/clients";
+			return Response.seeOther(URI.create("/portal/clients?error=User+not+authenticated")).build();
 		}
 
 		try {
 			clientService.updateClient(clientId, grantTypes, redirectUrls, scopes);
-			redirectAttributes.addFlashAttribute("success", "Client updated successfully!");
+			return Response.seeOther(URI.create("/portal/clients?success=Client+updated+successfully")).build();
 		} catch (Exception e) {
-			LOGGER.error("Error updating client: {}", e.getMessage());
-			redirectAttributes.addFlashAttribute("error", "Failed to update client");
-			return "redirect:/portal/clients";
+			Log.errorf("Error updating client: %s", e.getMessage());
+			return Response.seeOther(URI.create("/portal/clients?error=Failed+to+update+client")).build();
 		}
-		return "redirect:/portal/clients";
 	}
 
-	@DeleteMapping("/{clientId}")
-	@PreAuthorize("@clientService.validateClientOwnership(authentication, #clientId)")
-	public String deleteClient(@PathVariable("clientId") String clientId, Authentication authentication, RedirectAttributes redirectAttributes) {
+	@DELETE
+	@Path("/{clientId}")
+	public Response deleteClient(@PathParam("clientId") String clientId) {
+		// Validate ownership
+		if (!clientService.validateClientOwnership(identity, clientId)) {
+			return Response.status(Response.Status.FORBIDDEN).build();
+		}
+		
 		clientService.deleteByClientId(clientId);
-		redirectAttributes.addFlashAttribute("success", "Client deleted successfully!");
-		return "redirect:/portal/clients";
+		return Response.seeOther(URI.create("/portal/clients?success=Client+deleted+successfully")).build();
 	}
 }

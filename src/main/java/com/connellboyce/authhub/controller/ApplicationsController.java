@@ -3,69 +3,86 @@ package com.connellboyce.authhub.controller;
 import com.connellboyce.authhub.model.dao.Application;
 import com.connellboyce.authhub.service.ApplicationService;
 import com.connellboyce.authhub.service.AuthUtilService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
+import java.net.URI;
 import java.util.Optional;
 
-@Controller
-@RequestMapping("/portal/operation/application")
+@Path("/portal/operation/application")
+@RolesAllowed("DEVELOPER")
 public class ApplicationsController {
-	@Autowired
-	private ApplicationService applicationService;
+	
+	@Inject
+	ApplicationService applicationService;
 
-	@Autowired
-	private AuthUtilService authUtilService;
+	@Inject
+	AuthUtilService authUtilService;
 
-	@PostMapping
-	public String createApplication(@RequestParam("applicationName") String name, @RequestParam("description") String description, Authentication authentication, RedirectAttributes redirectAttributes) {
-		Optional<String> userId = authUtilService.getUserIdFromAuthentication(authentication);
+	@Inject
+	SecurityIdentity identity;
+
+	@POST
+	@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+	public Response createApplication(
+			@FormParam("applicationName") String name,
+			@FormParam("description") String description) {
+		
+		Optional<String> userId = authUtilService.getUserIdFromSecurityIdentity(identity);
 		if (userId.isEmpty()) {
-			redirectAttributes.addFlashAttribute("error", "User not authenticated");
-			return "redirect:/portal/applications";
+			return Response.seeOther(URI.create("/portal/applications?error=User+not+authenticated")).build();
 		}
 
 		try {
 			Application result = applicationService.createApplication(name, description, userId.get());
 			if (result != null) {
-				redirectAttributes.addFlashAttribute("success", "Application created successfully!");
+				return Response.seeOther(URI.create("/portal/applications?success=Application+created+successfully")).build();
 			} else {
-				redirectAttributes.addFlashAttribute("error", "Application creation failed");
+				return Response.seeOther(URI.create("/portal/applications?error=Application+creation+failed")).build();
 			}
-			return "redirect:/portal/applications";
 		} catch (IllegalArgumentException e) {
-			redirectAttributes.addFlashAttribute("error", "Application creation failed");
-			return "redirect:/portal/applications";
+			return Response.seeOther(URI.create("/portal/applications?error=Application+creation+failed")).build();
 		}
 	}
 
-	@PutMapping
-	@PreAuthorize("@applicationService.validateApplicationOwnership(authentication, #id)")
-	public String updateApplication(@RequestParam("id") String id, @RequestParam("applicationName") String name, @RequestParam("description") String description, Authentication authentication, RedirectAttributes redirectAttributes) {
-		Optional<String> userId = authUtilService.getUserIdFromAuthentication(authentication);
+	@PUT
+	@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+	public Response updateApplication(
+			@FormParam("id") String id,
+			@FormParam("applicationName") String name,
+			@FormParam("description") String description) {
+		
+		// Validate ownership
+		if (!applicationService.validateApplicationOwnership(identity, id)) {
+			return Response.status(Response.Status.FORBIDDEN).build();
+		}
+		
+		Optional<String> userId = authUtilService.getUserIdFromSecurityIdentity(identity);
 		if (userId.isEmpty()) {
-			redirectAttributes.addFlashAttribute("error", "User not authenticated");
-			return "redirect:/portal/applications/" + id;
+			return Response.seeOther(URI.create("/portal/applications/" + id + "?error=User+not+authenticated")).build();
 		}
 
 		Application result = applicationService.updateApplication(id, name, description, userId.get());
 		if (result != null) {
-			redirectAttributes.addFlashAttribute("success", "Application updated successfully!");
+			return Response.seeOther(URI.create("/portal/applications/" + id + "?success=Application+updated+successfully")).build();
 		} else {
-			redirectAttributes.addFlashAttribute("error", "Application update failed");
+			return Response.seeOther(URI.create("/portal/applications/" + id + "?error=Application+update+failed")).build();
 		}
-		return "redirect:/portal/applications/" + id;
 	}
 
-	@DeleteMapping("/{id}")
-	@PreAuthorize("@applicationService.validateApplicationOwnership(authentication, #id)")
-	public String deleteApplication(@PathVariable("id") String id, Authentication authentication, RedirectAttributes redirectAttributes) {
+	@DELETE
+	@Path("/{id}")
+	public Response deleteApplication(@PathParam("id") String id) {
+		// Validate ownership
+		if (!applicationService.validateApplicationOwnership(identity, id)) {
+			return Response.status(Response.Status.FORBIDDEN).build();
+		}
+		
 		applicationService.deleteApplicationById(id);
-		redirectAttributes.addFlashAttribute("success", "Application deleted successfully!");
-		return "redirect:/portal/applications";
+		return Response.seeOther(URI.create("/portal/applications?success=Application+deleted+successfully")).build();
 	}
 }
